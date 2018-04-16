@@ -1,0 +1,561 @@
+---
+title: "Machine Learning Workshop"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
+
+The working directory is automatically set to the folder where you have saved this file - for the purpose of the workshop, its best to keep all your work in a dedicated folder.
+
+
+
+
+
+R BASICS
+
+First you should set your working directory
+Any data you read or write from will be read or written to this directory.
+You can do this using Session and Set Working directory, or by using the code.
+
+```{r}
+getwd()
+setwd("C:/Users/Byron Graham/Documents/AOMWorkshop")
+```
+
+
+
+
+Assignment Operatiors
+
+Below is a numeric vector and a character vector with the first element assigned using <- notice the "" around the string. NOtice the hash # used for commenting - it's good practice to use lots of comments to explain your code.
+
+```{r}
+###numeric
+x <- 1
+print(x)
+
+###character
+y <- "foo"
+print(y)
+```
+
+
+
+
+
+Creating Vectors
+
+```{r}
+x<- c(2, 5, 7) #numeric vector
+y <- c(TRUE, FALSE) #logical vector
+z<- c("foo", "bar") #character
+```
+
+
+Creating Lists
+
+Notice the double brackets indicating the objects of the list.
+
+```{r}
+x<- list(1, TRUE, "foo")
+x
+```
+
+
+Data Frames
+Used for storing tabular data - one of the most important data types in R.
+Represented as lists where every elemnt has the same length - i.e. columns in the table have to be the same length
+Different columns can hold different data types, but each column must only hold one data type.
+The data read in was automatically converted to a data frame
+
+columns of a data frame are accessed using the $ sign
+
+```{r}
+data$SalePrice
+```
+
+
+Functions in R
+
+Functions are a crucila component of R - they allow you to keep a set of instructions for future use. Many of the tesks we will carry out her are by calling functions held in R packages.
+
+name<- function (arguments) {body}
+
+```{r}
+add<- function(x,y) {
+  x + y
+}
+
+add(3,2)
+```
+
+
+
+MACHINE LEARNING TUTORIAL
+
+If you have not already done so, please install the required packages.
+
+```{r}
+install.packages(c("caret", "dplyr", "rpart", "gbm", "ggplot2", "corrplot", "rpart.plot", "randomForest"))
+```
+
+
+
+
+
+Load the Required packages
+caret - functions for many machine learning tasks, as well as standardising the interface to over 100 ML models
+dplyr - part of 'tidyverse', for manipulating data
+rpart - recursive partitioning for regression and classification trees
+gbm - gradient boosted machines
+ggplot2 - data visualisation
+
+Notice the warnings which may have appeared when you run the code below. The first may be that the package was built using a different version of R - you can either update R, or continue on anyway. The second is about object masking - this occurs when two packages have functions with the same names. see: https://stackoverflow.com/questions/39137110/what-does-the-following-object-is-masked-from-packagexxx-mean for more details.
+
+```{r}
+library(caret)
+library(dplyr)
+library(rpart)
+library(gbm)
+library(randomForest)
+library(ggplot2)
+library(corrplot)
+```
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
+
+Load the data. For this workshop we will use the popular Ames House Price dataset. The dataset is used a lot for educational purposes, and is also hosted on kaggle, where there are some nice visualisations and novel analyses of the data.
+
+Data can be read using read.csv() 
+The csv file can be read directly from the internet or from a local drive
+
+```{r}
+#data<-read_excel("C:/Users/3052053/Downloads/AmesHousing.xls")
+
+data <- read.csv(url("https://www.openintro.org/stat/data/ames.csv"))
+```
+
+
+produce a quick summary of the data to get a feeel for the variables included
+```{r}
+summary(data)
+
+str(data)
+
+dim(data)
+```
+
+
+use str() to check the variables are of the correct type.
+
+we (often) need to convert any variables that are of the 'wrong' type
+
+```{r}
+data$Overall.Qual<-as.factor(data$Overall.Qual)
+data$Kitchen.Qual<-as.factor(data$Kitchen.Qual)
+
+```
+
+
+Several variables have missing data. There are a number of options for dealing with these:
+Ignore them (some models deal with these automatically)
+Remove incomplete cases
+Remove specific variables with high amounts of missing data
+Investigate why they are missing (some should actually be 'none' rather than NA)
+Impute missing values
+
+```{r}
+sum(is.na(data))
+
+
+```
+
+
+Add in 0 or None where appropriate for integers
+```{r}
+data$Garage.Area[is.na(data$Garage.Area)] <- 0
+
+```
+
+add 'none' where appropriate for factors
+
+```{r}
+levels <- levels(data$Garage.Qual)
+levels[length(levels) + 1] <- "None"
+data$Garage.Qual<- factor((data$Garage.Qual), levels = levels)
+data$Garage.Qual[is.na(data$Garage.Qual)] <- "None"
+```
+
+Remove Columns with missing values
+
+```{r}
+NAcol <- which(colSums(is.na(data)) > 0)
+data<- select(data, -NAcol)
+```
+
+
+
+Other Preprocessing
+
+Caret provides several functions for preprocessing data including centering and scaling data.
+
+
+
+One of the strengths of R is its outstnading visualisation capabilities - particularly ggplot2. To get a better feel for the data lets create some plots. The base plot option is good, but ggplot2 
+
+For this we will use ggplot2, which draws on the grammar of graphics - which breaks plots down into their components. This allows a lot of flexibility when creating charts as we can build these up from their component parts. i.e. aesthetics (size, colour, shape), geometric objects (points, lines, bars)....
+
+There are two main ways to create plots using ggplot2 - one is to use qplot, (i.e. quickplot) which is similar to the base plot option; and the other is to use ggplot, which provides more flexibility, particularly through layering.
+
+base plotting
+
+```{r}
+options(scipen=10000)
+
+plot(data$SalePrice ~ data$Lot.Area)
+
+```
+
+```{r}
+plot(data$Overall.Qual, data$SalePrice)
+```
+
+
+Using qplot:
+
+```{r}
+
+
+qplot(
+      SalePrice, Garage.Area, 
+      data= data, 
+      colour=Overall.Qual,
+      xlab = "Garage Area (Sq Ft)", ylab = "Sale Price $",
+      main = "Sale Price and Garage Area"
+      )
+
+```
+
+```{r}
+qplot(SalePrice, Garage.Area, data=data, geom = c("point", "smooth"), method="lm")
+```
+
+```{r}
+qplot(Overall.Qual, SalePrice, data= data, geom = "boxplot", group=Overall.Qual)
+```
+
+```{r}
+qplot(SalePrice, data=data, fill = Overall.Qual, geom="histogram")
+```
+
+
+```{r}
+
+qplot(Overall.Qual, data=data, fill=Overall.Qual, geom="bar")
+
+```
+
+
+Using ggplot:
+```{r}
+ggplot(data, aes(Overall.Qual)) + geom_bar()
+```
+
+```{r}
+ggplot(data=data[!is.na(data$SalePrice),], aes(x=SalePrice)) +
+        geom_histogram(fill="blue")
+```
+```{r}
+ggplot(data=data[!is.na(data$SalePrice),], aes(x=factor(Overall.Qual), y=SalePrice))+
+    geom_boxplot() + labs(x='Overall Quality')
+```
+
+```{r}
+ggplot(data=data[!is.na(data$SalePrice),], aes(x=Gr.Liv.Area, y=SalePrice))+
+        geom_point(col='blue') + geom_smooth(method = "lm", se=FALSE, color="black", aes(group=1))
+```
+
+
+
+```{r}
+
+ggplot(data=data, aes(x=Overall.Qual)) +
+        geom_histogram(stat='count')
+
+```
+
+
+
+```{r}
+numeric <- which(sapply(data, is.numeric))
+subset<- data[,numeric]
+
+cor<- cor(subset, use="pairwise.complete.obs")
+
+#sort correlations
+cor_sort<- as.matrix(sort(cor[,'SalePrice'], decreasing=TRUE))
+
+#high correlations
+high<-names(which(apply(cor_sort, 1, function(x) abs(x)>0.5)))
+
+cor<- cor[high, high]
+
+corrplot.mixed(cor, tl.col="black", tl.pos="lt")
+```
+
+
+
+
+
+
+Now that we have a good understnading of the data we can build some machine learning models. By way of comparison and illustration the code for building a linear regression model is shown below.
+
+Go ahead and amend the formula below to include additonal variables you think might be important.
+
+N.B. In a data mining approach we might consider using a feature selection algorithm to determine which variables should be inclued in the prediction model.
+
+log sale price
+```{r}
+data$SalePrice <- log(data$SalePrice + 1)
+```
+
+
+create a formula
+NB. many models allow the formula interface, as well as a variable interfece
+
+```{r}
+formula<- SalePrice ~ Full.Bath + Lot.Area + Year.Built + Overall.Qual + Exter.Qual
+```
+
+
+```{r}
+lm<- lm(data = data, formula = formula)
+lm
+summary(lm)
+```
+
+
+
+The first step is to carry out feature selection
+
+```{r}
+
+
+x=nearZeroVar(data[,-81]) # list of all the near zero variance predictors
+colnames(data[x]) #names of the predictors with near zero variance
+
+barplot(table(data$Street)) #Example
+
+data<-data[,-x]
+
+```
+
+
+Machine Learning MOdels
+
+CARET provides a wrapper for over 200 machine learning models
+
+```{r}
+names(getModelInfo())
+```
+
+
+
+
+to get a more accurate picture of the model performance we split the data into a training and test set - common proportions are 80/20 or 70/30 The caret package has a function to do this createDataPartition() which splits the data using stratified random sampling. NB. in this is not the best option for all types of data e.g. time series data
+
+
+```{r}
+trainIndex <- createDataPartition(data$SalePrice, p = .8, 
+                                  list = FALSE, 
+                                  times = 1)
+
+train <- data[ trainIndex,]
+test  <- data[-trainIndex,]
+```
+
+
+with many machine learning models there are parameters that must be tuned e.g. learning rate, tree depth, number of observations in a node. As there is no mathematical formula to select the best parameters we tune the model by iterating through combinations of parameters using cross validation....... we can do this using the fit control function in caret / a custom tuning grid
+
+
+If we only specify trainControl, CARET picks three random values for each parameter and tunes based on these
+
+```{r}
+fitControl<- trainControl(
+            method = "repeatedcv",
+            number=5,
+            repeats=5
+                          )
+```
+
+
+
+
+
+
+A custom tuning grid allows us to specify the search space for each parameter. Alternatively we can use the tuneLength option directly in the train function to control the tune length.
+
+check which parameters need tuned for each model
+
+```{r}
+modelLookup(model='gbm')
+```
+
+
+```{r}
+GBMGrid <- expand.grid(interaction.depth=c(1, 3, 5), n.trees = (0:50)*50,
+                         shrinkage=c(0.01, 0.001),
+                         n.minobsinnode=10)
+```
+
+
+
+Training the models
+
+
+
+Model1: Linear Regression
+
+```{r}
+set.seed(999)
+glm <- train(formula,
+              data=train,
+              method = "glm", 
+              trControl = fitControl
+              )
+
+glm
+
+```
+
+
+Make Predictions on the Test Set
+
+```{r}
+lm_predict <- predict(glm, newdata = test)
+```
+
+
+
+Evaluate the Accuracy of the Model
+```{r}
+postResample(pred = lm_predict, obs = test$SalePrice)
+
+```
+
+
+Model2: Regression Tree
+```{r}
+rpart<- train(formula,
+              data=train,
+              method="rpart2",
+              tuneLength = 10,
+              trControl=fitControl)
+
+rpart
+```
+
+
+View the tree
+```{r}
+rpart$finalModel
+```
+
+```{r}
+library(rpart.plot)
+rpart.plot(rpart$finalModel, digits=-3)
+```
+
+NB. in the tree above CARET has converted the factor vairables to dummy variables - which isn't necessarily what we want to happen
+
+Make Predictions
+```{r}
+rpartpred<- predict(rpart, newdata = test)
+```
+
+
+
+Evaluate Performance against the test set
+```{r}
+postResample(rpartpred, test$SalePrice)
+```
+
+
+
+model3 Gradient Boosted Machine
+
+```{r}
+gbm <- train(formula,
+              data=train,
+              method = "gbm", 
+              trControl = fitControl,
+              #tuneGrid = GBMGrid,
+              verbose=FALSE
+              )
+
+gbm
+```
+
+
+check the variable importance
+
+```{r}
+
+plot(varImp(gbm), main = "Variable Importance")
+```
+
+
+
+predict house prices based on the best model
+
+
+```{r}
+
+gbm_predictions<- predict(gbm, newdata=test)
+
+
+```
+
+
+Evaluate Performance
+
+```{r}
+postResample(gbm_predictions, test$SalePrice)
+```
+
+
+
+
+Model 4: Random Forest
+
+
+```{r}
+
+randomforest_model <- train(SalePrice ~ Lot.Area + Overall.Qual,
+                            data = train,
+                            method = "rf",
+                            ntree=5,
+                            trainControl = fitControl)
+
+randomforest_model
+
+```
+
+
+Make Predictions
+
+```{r}
+rfpredict<- predict(randomforest_model, test)
+```
+
+
+Evaluate performance
+
+```{r}
+postResample(rfpredict, test$SalePrice)
+```
+
